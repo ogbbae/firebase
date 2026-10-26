@@ -106,7 +106,9 @@ const RD31 = {
   "zimnyaya-vishnya": [1], "grenfell": [1], "admiral": [1, 2], "mega-himki": [2, 3], "rostov-2017": [4], "ostankino-2000": [3], "manezh-2004": [2, 5],
   "kamyshevatskaya-2007": [1], "tver-vko-2022": [1], "wildberries-shushary": [1, 3], "chernobyl-1986": [2, 3], "notre-dame-2019": [3], "wtc-2001": [1],
   "plasco-2017": [1, 2], "london-1666": [4], "beirut-2020": [2], "windsor-2005": [2, 4], "wb-2026-series": [1], "ozon-saratov-2026": [1],
-  "ivanovo-2026": [2], "pushkino-2025": [2, 4], "rostov-warehouse-2025": [3]
+  "ivanovo-2026": [2], "pushkino-2025": [2, 4], "rostov-warehouse-2025": [3],
+  "triangle-1911": [1], "iroquois-1903": [1], "angels-school-1958": [1], "kings-cross-1987": [1], "daegu-2003": [1], "baku-metro-1995": [1],
+  "rossiya-1977": [1], "piper-alpha-1988": [2], "texas-city-2005": [2], "buncefield-2005": [2, 4], "tianjin-2015": [2], "lahaina-2023": [1, 4]
 };
 const P31 = [
   ["Угроза жизни людей", "спасение людей, первая помощь"],
