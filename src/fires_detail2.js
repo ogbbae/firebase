@@ -174,6 +174,7 @@ const SCHEMES2 = {
 };
 
 /* --- merge --- */
+const SCHEME_REG = {}; /* функции схем хранятся отдельно: данные пожаров клонируются через JSON (CMS) и теряют функции */
 FIRES.forEach(f => {
   const d = DETAIL2[f.id];
   if (d) Object.entries(d).forEach(([k, v]) => {
@@ -189,4 +190,5 @@ FIRES.forEach(f => {
   f.schemes.push({ section: "command", title: "Кто кому докладывает на пожаре (по Боевому уставу)", src: ["lex_777"], svg: reportsSVG,
     caption: "Учебная схема по пунктам 13–15, 20, 33, 38–41, 45–47 и 50 Боевого устава (приказ МЧС № 777). Сравните её с тем, как управляли тушением на этом пожаре (текст выше)." });
   if (!f.sources.includes("lex_777")) f.sources.push("lex_777");
+  SCHEME_REG[f.id] = f.schemes;
 });

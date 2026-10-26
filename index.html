@@ -1808,6 +1808,7 @@ const SCHEMES2 = {
 };
 
 /* --- merge --- */
+const SCHEME_REG = {}; /* функции схем хранятся отдельно: данные пожаров клонируются через JSON (CMS) и теряют функции */
 FIRES.forEach(f => {
   const d = DETAIL2[f.id];
   if (d) Object.entries(d).forEach(([k, v]) => {
@@ -1823,6 +1824,7 @@ FIRES.forEach(f => {
   f.schemes.push({ section: "command", title: "Кто кому докладывает на пожаре (по Боевому уставу)", src: ["lex_777"], svg: reportsSVG,
     caption: "Учебная схема по пунктам 13–15, 20, 33, 38–41, 45–47 и 50 Боевого устава (приказ МЧС № 777). Сравните её с тем, как управляли тушением на этом пожаре (текст выше)." });
   if (!f.sources.includes("lex_777")) f.sources.push("lex_777");
+  SCHEME_REG[f.id] = f.schemes;
 });
 
 /* ===== Полные тексты в свободном доступе =====
@@ -2725,7 +2727,7 @@ function vFire(id) {
     else if (k === "books") { const bs = (o.books || []).map(b => resolve("book." + b)).filter(visible); inner = bs.length ? `<div class="rel">${bs.map(b => `<a href="${href(b)}"><b>${esc(b.title)}</b><small>${esc(b.obj.author)}</small></a>`).join("")}</div>` : '<p class="muted">Связанные книги пока не добавлены.</p>'; }
     else if (k === "sources") { inner = '<div id="srcSlot"></div>'; }
     else { const s = o.sections?.[k] || { s: "none", t: "" }; st = s.s; inner = s.t ? `<div class="prose">${md(s.t, ctx)}</div>` : `<p class="muted">Сведения не установлены или не опубликованы в использованных материалах.</p>`; if (!s.t) st = "none"; }
-    (o.schemes || []).filter(sc => sc.section === k).forEach(sc => { (sc.src || []).forEach(id => { if (SOURCES[id] && !ctx.includes(id)) ctx.push(id); }); inner += `<figure class="scheme"><figcaption><span class="eyebrow">Схема</span> ${esc(sc.title)}</figcaption>${sc.svg()}${sc.caption ? `<p class="small muted" style="margin:8px 0 0">${esc(sc.caption)}</p>` : ""}<p class="small" style="margin:6px 0 0;color:var(--fg3)">Схема редакции по данным источников ${(sc.src || []).map(id => "[" + (ctx.indexOf(id) + 1) + "]").join(" ")}, не в масштабе.</p></figure>`; });
+    ((typeof SCHEME_REG !== "undefined" && SCHEME_REG[o.id]) || o.schemes || []).filter(sc => sc.section === k && typeof sc.svg === "function").forEach(sc => { (sc.src || []).forEach(id => { if (SOURCES[id] && !ctx.includes(id)) ctx.push(id); }); inner += `<figure class="scheme"><figcaption><span class="eyebrow">Схема</span> ${esc(sc.title)}</figcaption>${sc.svg()}${sc.caption ? `<p class="small muted" style="margin:8px 0 0">${esc(sc.caption)}</p>` : ""}<p class="small" style="margin:6px 0 0;color:var(--fg3)">Схема редакции по данным источников ${(sc.src || []).map(id => "[" + (ctx.indexOf(id) + 1) + "]").join(" ")}, не в масштабе.</p></figure>`; });
     return `<section class="isec" id="s-${k}"><div class="isec-h"><span class="num">${String(n + 1).padStart(2, "0")}</span><h2 class="h3">${t}</h2>${st ? relBadge(st) : ""}</div>${inner}</section>`;
   }).join("");
   const html = `${crumbs([["Реальные пожары", "#fires"], [o.title, null]])}
