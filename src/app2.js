@@ -95,7 +95,7 @@ const NAV = [["home", "Главная"], ["ref", "Справочник РТП"],
 const SECTION_OF = { read: "lib", mylib: "lib", ref: "ref", fire: "fires", fires: "fires", compare: "fires", map: "fires", lib: "lib", book: "lib", norms: "norms", norm: "norms", learn: "learn", test: "learn", scen: "learn", calc: "learn", results: "learn" };
 let CUR = { view: "home", arg: null };
 let SEARCH_Q = "", SEARCH_TYPE = "all";
-const CATALOG = { ref: { q: "", cat: "all", sort: "title", n: 9 }, fires: { q: "", cat: "all", country: "all", year: "all", scale: "all", sort: "date-desc", view: "cards", n: 9 }, lib: { q: "", cat: "all", sort: "title", n: 9 }, norms: { q: "", type: "all", status: "all", sort: "adopted-desc", n: 12 } };
+const CATALOG = { ref: { q: "", cat: "all", sort: "title", n: 9 }, fires: { q: "", cat: "all", country: "all", year: "all", scale: "all", sort: "date-desc", view: "cards", n: 9 }, lib: { q: "", shelf: "full", cat: "all", sort: "title", n: 9 }, norms: { q: "", type: "all", status: "all", sort: "adopted-desc", n: 12 } };
 let COMPARE = new Set();
 
 function parseHash() {

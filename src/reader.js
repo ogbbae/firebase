@@ -36,7 +36,7 @@ function diaryHtml(it) {
 }
 function notesList(key, jump) {
   const st = bookState(key); if (!st.notes.length) return `<p class="small muted" style="margin:0">Заметок пока нет.</p>`;
-  return `<ul class="notes">${st.notes.map(n => `<li><div>${n.quote ? `<blockquote>${esc(n.quote)}</blockquote>` : ""}${n.text ? `<p>${esc(n.text)}</p>` : ""}<span class="small muted">${n.pid ? "п. " + esc(n.label || n.pid) : n.page ? "стр. " + esc(n.page) : ""} · ${new Date(n.at).toLocaleDateString("ru-RU")}</span></div><span class="row" style="gap:4px;flex-wrap:nowrap">${jump && n.pid ? `<button class="btn sm ghost" data-rjump="${esc(n.pid)}">Перейти</button>` : ""}<button class="btn sm ghost" data-ndel="${esc(key)}|${esc(n.id)}" aria-label="Удалить заметку">✕</button></span></li>`).join("")}</ul>`;
+  return `<ul class="notes">${st.notes.map(n => `<li><div>${n.quote ? `<blockquote>${esc(n.quote)}</blockquote>` : ""}${n.text ? `<p>${esc(n.text)}</p>` : ""}<span class="small muted">${n.pid ? esc(noteLabel(n)) : n.page ? "стр. " + esc(n.page) : ""} · ${new Date(n.at).toLocaleDateString("ru-RU")}</span></div><span class="row" style="gap:4px;flex-wrap:nowrap">${jump && n.pid ? `<button class="btn sm ghost" data-rjump="${esc(n.pid)}">Перейти</button>` : ""}<button class="btn sm ghost" data-ndel="${esc(key)}|${esc(n.id)}" aria-label="Удалить заметку">✕</button></span></li>`).join("")}</ul>`;
 }
 function diaryBind(key) {
   const st = bookState(key);
@@ -64,9 +64,9 @@ function vRead(id) {
    <p class="small" style="margin:0;color:var(--fg2)">Выделите фрагмент текста, чтобы отметить его или добавить заметку.</p></header>
    ${resume}${body}
    <section class="panel stack" style="margin-top:30px"><span class="eyebrow">Итоги прочитанного</span>
-    <label class="row" style="gap:8px;cursor:pointer"><input type="checkbox" id="rDone" ${st.status === "done" ? "checked" : ""} style="accent-color:var(--red);width:18px;height:18px"> Документ прочитан</label>
-    <div class="field"><label for="rSum">Главное, что нужно запомнить</label><textarea id="rSum" class="inp" maxlength="8000" placeholder="Например: звено не менее 3 человек; пост безопасности определяет командир звена; КПП — при 3 и более звеньях…">${esc(st.summary)}</textarea></div>
-    <div class="row"><button class="btn pri sm" data-rsave>Сохранить итоги</button><a class="btn sm" href="#test.gdzs-ticket3">Проверить себя: билет ГДЗС № 3</a><a class="btn sm ghost" href="#mylib">Моя библиотека</a></div></section>
+    <label class="row" style="gap:8px;cursor:pointer"><input type="checkbox" id="rDone" ${st.status === "done" ? "checked" : ""} style="accent-color:var(--red);width:18px;height:18px"> Прочитано полностью</label>
+    <div class="field"><label for="rSum">Главное, что нужно запомнить</label><textarea id="rSum" class="inp" maxlength="8000" placeholder="3–5 главных выводов: что пригодится на службе, на зачёте или в жизни">${esc(st.summary)}</textarea></div>
+    <div class="row"><button class="btn pri sm" data-rsave>Сохранить итоги</button>${T.test ? `<a class="btn sm" href="${T.test.href}">${esc(T.test.label)}</a>` : ""}<a class="btn sm ghost" href="#mylib">Моя библиотека</a></div></section>
   </article>
   <aside class="side"><nav class="panel" aria-label="Оглавление"><span class="eyebrow">Оглавление</span><div class="toc">${T.parts.map(([h], i) => `<button data-scroll="rh-${i}"><span class="num">${i || "—"}</span>${esc(h)}</button>`).join("")}</div></nav>
    <div class="panel"><span class="eyebrow">Мои заметки</span><div id="rnotes">${notesList(it.key, true)}</div></div>
@@ -74,7 +74,8 @@ function vRead(id) {
   <div class="selbar" id="selbar" hidden><button class="btn sm" data-sel="hl">Отметить</button><button class="btn sm pri" data-sel="note">Заметка</button></div>
   <div class="notebox" id="notebox" hidden><blockquote id="nbQuote"></blockquote><label class="sr" for="nbText">Текст заметки</label><textarea id="nbText" class="inp" placeholder="Ваша заметка (необязательно)" maxlength="4000"></textarea><div class="row"><button class="btn sm pri" data-nb="save">Сохранить</button><button class="btn sm" data-nb="cancel">Отмена</button></div></div>`;
 }
-function paraLabel(T, pid) { const [i, j] = pid.split(".").map(Number); const t = T.parts[i][1][j] || ""; const m = t.match(/^(\d+)\./); return T.parts[i][0].startsWith("Приложение") ? "приложении № 3, п. " + (m ? m[1] : j + 1) : m ? "п. " + m[1] : "разделе «" + T.parts[i][0] + "»"; }
+function noteLabel(n) { const l = n.label || n.pid; return /^\d/.test(l) ? "п. " + l : l.replace(/^статье /, "ст. ").replace(/^приложении /, "прил. ").replace(/^разделе /, ""); }
+function paraLabel(T, pid) { const [i, j] = pid.split(".").map(Number); const t = T.parts[i][1][j] || "", h = T.parts[i][0]; const m = t.match(/^(\d+)\./); const ap = h.match(/^Приложение\s*(?:N|№)\s*(\d+)/); const art = h.match(/^Статья ([\d.]+?)\.? /); return ap ? "приложении № " + ap[1] + (m ? ", п. " + m[1] : "") : art ? "статье " + art[1] + (j ? ", абз. " + (j + 1) : "") : m ? "п. " + m[1] : "разделе «" + (h.length > 60 ? h.slice(0, 57) + "…" : h) + "», абз. " + (j + 1); }
 function hlText(p, pid, st) {
   let h = esc(p); st.notes.filter(n => n.pid === pid && n.quote).forEach(n => { const q = esc(n.quote); const k = h.indexOf(q); if (k >= 0) h = h.slice(0, k) + `<mark class="hl" data-nid="${esc(n.id)}" title="${esc(n.text || "Отмечено")}">${q}</mark>` + h.slice(k + q.length); });
   return h;

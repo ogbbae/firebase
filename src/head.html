@@ -149,7 +149,7 @@ h1,h2,h3{text-wrap:balance;margin:0}
 .card .t:hover{text-decoration:underline;text-decoration-color:var(--red);text-underline-offset:3px}
 .card .meta{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:12.5px;color:var(--fg3)}
 .card .d{color:var(--fg2);font-size:14px;margin:0;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
-.card .foot{margin-top:auto;display:flex;align-items:center;gap:8px;justify-content:space-between}
+.card .foot{margin-top:auto;display:flex;flex-wrap:wrap;align-items:center;gap:8px;justify-content:space-between}
 .card .foot>*{position:relative;z-index:1}
 .card .top{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .card .top>*{position:relative;z-index:1}
@@ -289,7 +289,7 @@ sup.ref a{font:600 10.5px var(--f-mono);color:var(--red-ink);text-decoration:non
 .reader-bar{position:sticky;top:calc(60px + env(safe-area-inset-top,0px));z-index:20;display:flex;gap:10px;align-items:center;background:var(--bg);padding:8px 0;border-bottom:1px solid var(--line);margin-bottom:14px}
 .reader{line-height:1.75;max-width:72ch}
 .reader .r-h{font:600 1.15em/1.35 var(--f-body);margin:34px 0 12px}
-.rp{margin:0 0 .9em;scroll-margin-top:130px;border-radius:4px;transition:background .6s}
+.rp{white-space:pre-line;overflow-wrap:anywhere;margin:0 0 .9em;scroll-margin-top:130px;border-radius:4px;transition:background .6s}
 .rp.flash{background:var(--warn-soft)}
 mark.hl{background:var(--warn-soft);color:inherit;border-bottom:2px solid var(--warn);cursor:pointer;padding:0 1px}
 .selbar{position:fixed;z-index:85;display:flex;gap:6px;background:var(--card);border:1px solid var(--line2);border-radius:8px;padding:6px;box-shadow:0 8px 24px rgba(0,0,0,.35)}

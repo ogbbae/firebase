@@ -16,9 +16,10 @@ const CAT_DEF = {
     sorts: [["date-desc", "Сначала новые"], ["date-asc", "Сначала старые"], ["title", "По названию"]],
     sort: (a, b, s) => s === "title" ? a.title.localeCompare(b.title, "ru") : s === "date-asc" ? a.obj.date.localeCompare(b.obj.date) : b.obj.date.localeCompare(a.obj.date),
     card: it => cardFire(it, true), list: true, emptyCat: "По выбранным фильтрам происшествий нет. Сбросьте часть фильтров." },
-  lib: { type: "book", title: "Библиотека", lead: "Книги, учебники и официальные отчёты расследований. Полные тексты защищённых изданий не размещаются — только ссылки на легальные источники.",
-    rail: c => railGroup("Тематика", "cat", [["all", "Все темы"], ...BOOK_CATS], c.cat, k => count("book", it => k === "all" || (it.obj.cats || [it.obj.cat]).includes(k))),
-    filter: (it, c) => c.cat === "all" || (it.obj.cats || [it.obj.cat]).includes(c.cat),
+  lib: { type: "book", title: "Библиотека", lead: "Полка «Читать здесь» — всё, что открывается целиком прямо в FIREBASE: уставы, законы, правила и классика в общественном достоянии. Книги, защищённые авторским правом, — на полке «Читать вне приложения»: с дневником чтения и заметками.",
+    rail: c => railGroup("Полка", "shelf", [["full", "Читать здесь"], ["out", "Читать вне приложения"], ["all", "Все книги"]], c.shelf, k => count("book", it => k === "all" || (k === "full") === (it.obj.access === "full")))
+      + railGroup("Тематика", "cat", [["all", "Все темы"], ...BOOK_CATS], c.cat, k => count("book", it => (c.shelf === "all" || (c.shelf === "full") === (it.obj.access === "full")) && (k === "all" || (it.obj.cats || [it.obj.cat]).includes(k)))),
+    filter: (it, c) => (c.q.trim() || c.shelf === "all" || (c.shelf === "full") === (it.obj.access === "full")) && (c.cat === "all" || (it.obj.cats || [it.obj.cat]).includes(c.cat)),
     sorts: [["title", "По названию"], ["year-desc", "Сначала новые"], ["year-asc", "Сначала старые"]],
     sort: (a, b, s) => s === "title" ? a.title.localeCompare(b.title, "ru") : s === "year-asc" ? (a.obj.year || 9999) - (b.obj.year || 9999) : (b.obj.year || 0) - (a.obj.year || 0),
     card: cardBook, grid: "g2", emptyCat: "Изданий по этой теме пока нет." },
@@ -39,7 +40,7 @@ function vCatalog(name) {
   const d = CAT_DEF[name], c = CATALOG[name];
   setMeta(d.title, d.lead);
   return `${crumbs([[d.title]])}<h1 class="h1">${d.title}</h1><p class="lead">${d.lead}</p>
-  ${name === "fires" ? `<div class="row" style="margin-top:14px"><a class="btn sm" href="#map">${I.map} Карта пожаров</a><a class="btn sm" href="#compare">${I.cmp} Сравнение</a></div>` : ""}${name === "lib" ? `<div class="row" style="margin-top:14px"><a class="btn sm pri" href="#mylib">${I.book} Моя библиотека: прогресс и заметки</a><a class="btn sm" href="#read.pravila-sizod">Читать Правила работы в СИЗОД</a></div>` : ""}
+  ${name === "fires" ? `<div class="row" style="margin-top:14px"><a class="btn sm" href="#map">${I.map} Карта пожаров</a><a class="btn sm" href="#compare">${I.cmp} Сравнение</a></div>` : ""}${name === "lib" ? `<div class="row" style="margin-top:14px"><a class="btn sm pri" href="#mylib">${I.book} Моя библиотека: прогресс и заметки</a><a class="btn sm" href="#read.bu777">Читать Боевой устав</a></div>` : ""}
   <div class="cat" data-cat="${name}"><aside class="rail"><details class="railbox" id="railbox" ${matchMedia("(max-width:900px)").matches ? "" : "open"}><summary>Фильтры</summary><div class="in" id="rail">${d.rail(c)}</div></details></aside>
   <div><div class="toolbar"><div class="search-inline">${I.search}<label class="sr" for="catQ">Поиск в разделе</label><input id="catQ" class="inp" value="${esc(c.q)}" placeholder="${d.numberSearch ? "Название или номер документа" : name === "lib" ? "Название или автор" : "Поиск по названию и содержанию"}" autocomplete="off"></div>
   <label class="sr" for="catSort">Сортировка</label><select id="catSort" class="inp">${d.sorts.map(([k, t]) => `<option value="${k}" ${c.sort === k ? "selected" : ""}>${t}</option>`).join("")}</select>
@@ -55,12 +56,13 @@ function catResults(name) {
     list = list.filter(it => hits.has(it.key) || (d.numberSearch && norm(it.obj.number).includes(qn)) || norm(it.title).includes(qn) || (it.obj.author && norm(it.obj.author).includes(qn)));
   }
   list.sort((a, b) => d.sort(a, b, c.sort));
-  if (!list.length) return `<div class="empty"><b>Ничего не найдено</b>${c.q ? "Попробуйте изменить запрос или " : ""}${d.emptyCat} <br><br><button class="btn sm" data-reset>Сбросить фильтры</button></div>`;
+  if (!list.length) return `${name === "lib" ? `<div class="row" style="margin-bottom:12px"><button class="btn sm f" data-f="shelf" data-v="all">Показать все книги</button></div>` : ""}<div class="empty"><b>Ничего не найдено</b>${c.q ? "Попробуйте изменить запрос или " : ""}${d.emptyCat} <br><br><button class="btn sm" data-reset>Сбросить фильтры</button></div>`;
   const shown = list.slice(0, c.n);
   const body = name === "fires" && c.view === "list"
     ? `<div class="list">${shown.map(it => `<a class="li" href="${href(it)}"><span class="mono small">${fmtDate(it.obj.date)}</span><span><b>${esc(it.title)}</b><br><span class="small muted">${esc(it.obj.city)}, ${esc(it.obj.country)}</span></span><span class="small">${esc(catName(FIRE_CATS, it.obj.cat))}</span><span class="small muted">Погибших: ${esc(it.obj.deathsText)}</span></a>`).join("")}</div>`
     : `<div class="grid ${d.grid || ""}">${shown.map(d.card).join("")}</div>`;
-  return `<div class="row" style="margin-bottom:10px"><span class="count">${plural(list.length, "материал", "материала", "материалов")}</span></div>${body}${list.length > c.n ? `<div style="text-align:center;margin-top:18px"><button class="btn" data-more>Показать ещё (${list.length - c.n})</button></div>` : ""}`;
+  const tabs = name === "lib" && !c.q.trim() ? `<div class="row" role="group" aria-label="Полка" style="margin-bottom:12px">${[["full", "Читать здесь"], ["out", "Читать вне приложения"], ["all", "Все"]].map(([k, t]) => `<button class="btn sm f ${c.shelf === k ? "pri" : ""}" data-f="shelf" data-v="${k}" aria-pressed="${c.shelf === k}">${t}</button>`).join("")}</div>${c.shelf === "out" ? `<p class="small muted" style="margin:0 0 12px">Эти книги защищены авторским правом, поэтому их текст в FIREBASE не размещается. На странице книги — дневник чтения: отмечайте страницы, пишите заметки и итоги.</p>` : ""}` : "";
+  return `${tabs}<div class="row" style="margin-bottom:10px"><span class="count">${plural(list.length, "материал", "материала", "материалов")}</span></div>${body}${list.length > c.n ? `<div style="text-align:center;margin-top:18px"><button class="btn" data-more>Показать ещё (${list.length - c.n})</button></div>` : ""}`;
 }
 function bindCatalog(name) {
   const c = CATALOG[name], d = CAT_DEF[name];
@@ -71,7 +73,7 @@ function bindCatalog(name) {
     const f = e.target.closest("button.f"); if (f) { c[f.dataset.f] = f.dataset.v; upd(); return; }
     const vm = e.target.closest("[data-viewmode]"); if (vm) { c.view = vm.dataset.viewmode; $$("[data-viewmode]").forEach(b => b.setAttribute("aria-pressed", b === vm)); upd(); return; }
     if (e.target.closest("[data-more]")) { c.n += 9; upd(); return; }
-    if (e.target.closest("[data-reset]")) { Object.assign(c, { q: "", cat: "all", country: "all", year: "all", scale: "all", type: "all", status: "all" }); $("#catQ").value = ""; upd(); }
+    if (e.target.closest("[data-reset]")) { Object.assign(c, { q: "", cat: "all", country: "all", year: "all", scale: "all", type: "all", status: "all" }); if (name === "lib") c.shelf = "all"; $("#catQ").value = ""; upd(); }
   });
 }
 const vRefCat = () => vCatalog("ref"), vFireCat = () => vCatalog("fires"), vLibCat = () => vCatalog("lib"), vNormCat = () => vCatalog("norms");
@@ -172,8 +174,8 @@ function vNorm(id) {
   const st = DOC_STATUS[o.docStatus] || ["—", "b-none", ""];
   const refs = (o.refs || []).map(r => resolve("ref." + r)).filter(visible);
   return `${crumbs([["Нормативная база", "#norms"], [o.number]])}<div class="art"><article><header class="art-head"><span class="kind">${esc(catName(NORM_TYPES, o.type))}</span><h1 class="h1" style="font-size:clamp(20px,2.8vw,30px)">${esc(o.number)} от ${fmtDate(o.adopted)}</h1><p class="lead" style="margin-top:0">«${esc(o.title)}»</p>
-   <div class="row">${o.id === "p640" ? `<a class="btn pri" href="#read.pravila-sizod">${I.book} Читать полный текст</a>` : ""}${favBtn(it.key, true)}${badge(st[1], st[0])}</div>
-   <div class="banner ${o.docStatus === "in-force-unverified" ? "" : "warn"}"><span>${I.info}</span><span>${esc(st[2])} ${o.docStatus === "in-force-unverified" ? "FIREBASE не называет документ действующим без такой сверки." : ""}</span></div></header>
+   <div class="row">${o.read ? `<a class="btn pri" href="#read.${esc(o.read)}">${I.book} Читать полный текст</a>` : ""}${favBtn(it.key, true)}${badge(st[1], st[0])}</div>
+   <div class="banner ${o.docStatus === "in-force-unverified" || o.docStatus === "in-force" ? "" : "warn"}"><span>${I.info}</span><span>${esc(st[2])} ${o.docStatus === "in-force-unverified" ? "FIREBASE не называет документ действующим без такой сверки." : ""}</span></div></header>
    <dl class="facts"><div><dt>Номер</dt><dd class="mono">${esc(o.number)}</dd></div><div><dt>Дата принятия</dt><dd class="mono">${fmtDate(o.adopted)}</dd></div><div><dt>Вступление в силу</dt><dd>${o.effective ? fmtDate(o.effective) : "не указано"}</dd></div><div><dt>Орган</dt><dd>${esc(o.issuer)}</dd></div><div><dt>Регистрация</dt><dd>${esc(o.reg || "—")}</dd></div><div><dt>Последняя проверка</dt><dd class="mono">${o.checked ? fmtDate(o.checked) : "не проводилась"}</dd></div></dl>
    <div class="prose" style="margin-top:22px"><h2>Краткое содержание</h2><p>${esc(o.summary)}</p><h2>История изменений</h2><p>${esc(o.history || "Нет данных.")}</p>
    <h2>Материалы справочника по документу</h2>${refs.length ? `<ul>${refs.map(r => `<li><a href="${href(r)}">${esc(r.title)}</a></li>`).join("")}</ul>` : "<p class='muted'>Пока нет.</p>"}</div>
