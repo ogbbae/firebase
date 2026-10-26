@@ -51,15 +51,89 @@ const AI_TOOLS = [
     execute: (inp) => { const it = resolve(String(inp.key)); if (!visible(it)) throw new Error("Материал не найден: " + inp.key); setAIStatus("Читаю: " + it.title + "…"); return itemDoc(it); } }
 ];
 function setAIStatus(t) { const s = $("#aiStatus"); if (s) s.innerHTML = `<span class="spin"></span>${esc(t)}`; }
+/* --- AI: two modes. "claude" = inside Claude (viewer's own account via sample);
+       "key" = standalone app, each visitor brings their own Anthropic API key (stored only in their browser). --- */
+const BYOK_MODELS = [["claude-sonnet-5-5", "Claude Sonnet 5.5 — баланс качества и цены"], ["claude-haiku-5-5", "Claude Haiku 5.5 — быстрее и дешевле"], ["claude-opus-5-5", "Claude Opus 5.5 — самый точный, дороже"]];
+const BYOK = { key: "", model: "claude-sonnet-5-5", remember: false };
+(function loadKey() { try { const r = localStorage.getItem("firebase-ai"); if (r) Object.assign(BYOK, JSON.parse(r), { remember: true }); } catch (e) {} try { const k = sessionStorage.getItem("firebase-ai-key"); if (k && !BYOK.key) BYOK.key = k; } catch (e) {} })();
+function saveKey() { try { if (BYOK.remember) localStorage.setItem("firebase-ai", JSON.stringify({ key: BYOK.key, model: BYOK.model })); else { localStorage.removeItem("firebase-ai"); sessionStorage.setItem("firebase-ai-key", BYOK.key); } } catch (e) {} }
+function forgetKey() { BYOK.key = ""; try { localStorage.removeItem("firebase-ai"); sessionStorage.removeItem("firebase-ai-key"); } catch (e) {} }
+const IN_CLAUDE = !!(window.claude && window.claude.use);
+const aiMode = () => CAP.sample ? "claude" : IN_CLAUDE ? "none" : "key";
+const aiReady = () => aiMode() === "claude" || (aiMode() === "key" && !!BYOK.key);
+const maskKey = k => k ? k.slice(0, 10) + "…" + k.slice(-4) : "";
+function keyPanel() {
+  if (aiMode() === "claude") return "";
+  if (aiMode() === "none") return `<div class="banner warn" style="margin-top:14px"><span>${I.info}</span><span>Доступ к Claude для этой страницы не разрешён в вашем аккаунте. Разрешение можно выдать в меню разрешений артефакта; ответы не подменяются заготовками — пока используйте <a href="#search" style="color:var(--red-ink)">поиск</a>.</span></div>`;
+  if (BYOK.key && !CHAT.editKey) return `<div class="banner" style="margin-top:14px"><span>${I.shield}</span><span>Подключён ваш ключ <span class="mono">${esc(maskKey(BYOK.key))}</span> · ${esc((BYOK_MODELS.find(m => m[0] === BYOK.model) || [, BYOK.model])[1])}. Запросы оплачиваются с вашего аккаунта Anthropic. ${BYOK.remember ? "Ключ сохранён на этом устройстве." : "Ключ будет забыт при закрытии вкладки."} <button class="btn ghost sm" data-key-edit>Изменить</button> <button class="btn ghost sm" data-key-forget>Удалить ключ</button></span></div>`;
+  return `<form class="panel stack" id="keyForm" style="margin-top:16px;max-width:720px" novalidate>
+   <span class="eyebrow">Подключите свой ключ, чтобы задавать вопросы</span>
+   <p class="small" style="margin:0">ИИ-помощник работает на модели Claude через <b>ваш собственный ключ API Anthropic</b>. Владелец сайта не платит за ваши вопросы и не видит ваш ключ: он хранится только в вашем браузере и отправляется напрямую в Anthropic, минуя любые другие серверы.</p>
+   <ol class="small" style="margin:0;padding-left:20px"><li>Зарегистрируйтесь на <a href="https://console.anthropic.com/" target="_blank" rel="noopener" style="color:var(--red-ink)">console.anthropic.com</a> и пополните баланс.</li><li>В разделе <b>API Keys</b> создайте ключ — он начинается с <span class="mono">sk-ant-</span>.</li><li>Вставьте ключ ниже. Совет: задайте в консоли Anthropic лимит расходов для этого ключа.</li></ol>
+   <div class="formgrid"><div class="field wide"><label for="keyInp">Ключ API Anthropic</label><input id="keyInp" class="inp mono" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-…" value="${esc(BYOK.key)}"></div>
+   <div class="field"><label for="keyModel">Модель</label><select id="keyModel" class="inp">${BYOK_MODELS.map(([k, t]) => `<option value="${k}" ${BYOK.model === k ? "selected" : ""}>${t}</option>`).join("")}</select></div></div>
+   <label class="row small" style="gap:8px;cursor:pointer"><input type="checkbox" id="keyRemember" ${BYOK.remember ? "checked" : ""} style="accent-color:var(--red);width:16px;height:16px"> Запомнить ключ на этом устройстве (не включайте на чужом или общем компьютере)</label>
+   <p class="ferr" id="keyErr" role="alert" hidden></p>
+   <div class="row"><button class="btn pri" type="submit" id="keySave">Подключить</button>${BYOK.key ? '<button class="btn" type="button" data-key-cancel>Отмена</button>' : ""}</div></form>`;
+}
 function vAI() {
   setMeta("ИИ-помощник", "Вопросы по материалам базы знаний FIREBASE");
-  const ctx = CHAT.context ? resolve(CHAT.context) : null;
-  return `${crumbs([["ИИ-помощник"]])}<h1 class="h1">ИИ-помощник по базе знаний</h1><p class="lead">Отвечает только по материалам FIREBASE и ссылается на них. Каждый запрос использует лимиты вашего аккаунта Claude; при первом запросе платформа попросит разрешение.</p>
-  ${CAP.sample ? "" : `<div class="banner warn" style="margin-top:14px"><span>${I.info}</span><span>Помощник недоступен в этом окне: он работает, когда страница открыта в Claude под вашим аккаунтом. Ответы не подменяются заготовками — пока используйте <a href="#search" style="color:var(--red-ink)">поиск</a>.</span></div>`}
+  const ctx = CHAT.context ? resolve(CHAT.context) : null, ready = aiReady();
+  const lead = aiMode() === "claude" ? "Отвечает только по материалам FIREBASE и ссылается на них. Каждый запрос использует лимиты вашего аккаунта Claude; при первом запросе платформа попросит разрешение." : "Отвечает только по материалам FIREBASE и ссылается на них. Работает через ваш личный ключ Anthropic — каждый посетитель платит только за свои вопросы.";
+  return `${crumbs([["ИИ-помощник"]])}<h1 class="h1">ИИ-помощник по базе знаний</h1><p class="lead">${lead}</p>
+  ${keyPanel()}
   ${ctx ? `<div class="banner" style="margin-top:14px"><span>${I.doc}</span><span>Контекст вопроса: <a href="${href(ctx)}" style="color:var(--red-ink)">${esc(ctx.title)}</a> <button class="btn ghost sm" data-ctxclear>Убрать</button></span></div>` : ""}
-  <div class="chat" id="chat" style="margin-top:20px">${CHAT.turns.length ? "" : `<div class="panel"><span class="eyebrow">Примеры вопросов</span><div class="row" style="margin-top:8px">${["Сделай краткий разбор пожара в Grenfell Tower", "Какие нарушения установил суд по пожару в ТЦ «Адмирал»?", "Чем осложнялось тушение Останкинской телебашни?", "Сравни пожары в «Зимней вишне» и «Адмирале»", "Какие документы связаны с расчётом ГДЗС?"].map(q => `<button class="chip" data-aiq="${esc(q)}">${esc(q)}</button>`).join("")}</div></div>`}</div>
-  <form class="composer" id="aiForm"><label class="sr" for="aiQ">Вопрос</label><textarea id="aiQ" class="inp" placeholder="Задайте вопрос по материалам базы…" ${CAP.sample ? "" : "disabled"} maxlength="2000"></textarea><button class="btn pri" type="submit" id="aiSend" ${CAP.sample ? "" : "disabled"}>Спросить</button><button class="btn" type="button" id="aiStop" hidden>Стоп</button></form>
-  <p class="small muted" style="margin-top:10px">Ответы формирует модель на основе материалов; проверяйте их по ссылкам на источники. Архитектура: поиск и чтение материалов выполняются функциями этой страницы, ключей API в коде нет.</p>`;
+  <div class="chat" id="chat" style="margin-top:20px">${CHAT.turns.length ? "" : `<div class="panel"><span class="eyebrow">Примеры вопросов</span><div class="row" style="margin-top:8px">${["Сделай краткий разбор пожара на Чернобыльской АЭС", "Какие нарушения установил суд по пожару в ТЦ «Адмирал»?", "Чем осложнялось тушение Останкинской телебашни?", "Сравни пожары в «Зимней вишне» и «Адмирале»", "Какие документы связаны с расчётом ГДЗС?"].map(q => `<button class="chip" data-aiq="${esc(q)}">${esc(q)}</button>`).join("")}</div></div>`}</div>
+  <form class="composer" id="aiForm"><label class="sr" for="aiQ">Вопрос</label><textarea id="aiQ" class="inp" placeholder="${ready ? "Задайте вопрос по материалам базы…" : "Сначала подключите ключ выше"}" ${ready ? "" : "disabled"} maxlength="2000"></textarea><button class="btn pri" type="submit" id="aiSend" ${ready ? "" : "disabled"}>Спросить</button><button class="btn" type="button" id="aiStop" hidden>Стоп</button></form>
+  <p class="small muted" style="margin-top:10px">Ответы формирует модель на основе материалов; проверяйте их по ссылкам на источники. Поиск и чтение материалов выполняются функциями этой страницы; в коде сайта нет ничьих ключей.</p>`;
+}
+async function keySubmit(e) {
+  e.preventDefault(); const err = $("#keyErr"), k = $("#keyInp").value.trim();
+  const fail = m => { err.hidden = false; err.textContent = m; $("#keyInp").classList.add("err"); $("#keyInp").focus(); };
+  if (!/^sk-ant-[A-Za-z0-9_\-]{20,}$/.test(k)) return fail("Ключ должен начинаться с sk-ant- — скопируйте его целиком из console.anthropic.com → API Keys.");
+  $("#keySave").disabled = true; $("#keySave").textContent = "Проверяю ключ…";
+  const model = $("#keyModel").value;
+  try { await anthropicCall({ key: k, model, max_tokens: 16, messages: [{ role: "user", content: "Ответь одним словом: готово" }] }); }
+  catch (ex) { $("#keySave").disabled = false; $("#keySave").textContent = "Подключить"; return fail(ex.message); }
+  Object.assign(BYOK, { key: k, model, remember: $("#keyRemember").checked }); saveKey(); CHAT.editKey = false; toast("Ключ подключён"); route();
+}
+async function anthropicCall({ key, model, max_tokens = 2048, system, messages, tools, signal }) {
+  let r;
+  try {
+    r = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", signal, headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" }, body: JSON.stringify(Object.assign({ model, max_tokens, messages }, system ? { system } : {}, tools ? { tools } : {})) });
+  } catch (e) { if (e.name === "AbortError") throw Object.assign(new Error("Ответ остановлен."), { code: "cancelled" }); throw new Error("Нет связи с сервером Anthropic. Проверьте интернет; в некоторых сетях доступ к api.anthropic.com может быть закрыт."); }
+  let j = null; try { j = await r.json(); } catch (e) {}
+  if (r.ok) return j;
+  const m = j && j.error && j.error.message || "";
+  if (r.status === 401) throw new Error("Ключ не принят: проверьте, что он скопирован полностью и не отозван.");
+  if (r.status === 403) throw new Error("У ключа нет доступа к этой модели или API. " + m);
+  if (r.status === 404) throw new Error("Модель не найдена для вашего ключа. Выберите другую модель.");
+  if (r.status === 429) throw new Error("Слишком много запросов или достигнут лимит ключа. Подождите и попробуйте снова.");
+  if (r.status === 529 || r.status >= 500) throw new Error("Сервис Anthropic временно перегружен. Попробуйте через минуту.");
+  if (/credit|balance|billing/i.test(m)) throw new Error("На аккаунте Anthropic недостаточно средств. Пополните баланс в console.anthropic.com.");
+  throw new Error("Запрос отклонён (" + r.status + "). " + m);
+}
+async function askViaKey(q, ctxIt) {
+  const tools = AI_TOOLS.map(t => ({ name: t.name, description: t.description, input_schema: t.inputSchema }));
+  const sys = AI_RULES + "\n\nИспользуй инструменты search_materials и get_material, прежде чем отвечать.";
+  const msgs = CHAT.turns.slice(-8).map(t => ({ role: t.role, content: t.sent || t.content }));
+  let shown = "";
+  for (let round = 0; round < 6; round++) {
+    const res = await anthropicCall({ key: BYOK.key, model: BYOK.model, system: sys, messages: msgs, tools, signal: CHAT.ctl.signal });
+    const text = (res.content || []).filter(b => b.type === "text").map(b => b.text).join("\n").trim();
+    if (text) { shown = shown ? shown + "\n\n" + text : text; drawChat(shown); }
+    const calls = (res.content || []).filter(b => b.type === "tool_use");
+    if (res.stop_reason !== "tool_use" || !calls.length) return { text: shown || "Модель не дала ответа. Попробуйте переформулировать вопрос.", truncated: res.stop_reason === "max_tokens" };
+    msgs.push({ role: "assistant", content: res.content });
+    const results = [];
+    for (const c of calls) {
+      const tool = AI_TOOLS.find(t => t.name === c.name); let out, isErr = false;
+      try { out = tool ? await tool.execute(c.input || {}, { signal: CHAT.ctl.signal }) : "Неизвестный инструмент"; } catch (e) { out = "Ошибка: " + e.message; isErr = true; }
+      results.push({ type: "tool_result", tool_use_id: c.id, content: typeof out === "string" ? out : JSON.stringify(out).slice(0, 30000), is_error: isErr || undefined });
+    }
+    msgs.push({ role: "user", content: results });
+  }
+  return { text: shown || "Не удалось завершить ответ за отведённое число шагов. Уточните вопрос.", truncated: true };
 }
 function drawChat(liveText) {
   const box = $("#chat"); if (!box) return;
@@ -67,29 +141,33 @@ function drawChat(liveText) {
     + (liveText != null ? `<div class="msg"><div class="who">FIREBASE · ИИ-помощник</div>${liveText ? `<div class="prose">${md(liveText, null)}</div>` : ""}<div class="thinking" id="aiStatus"><span class="spin"></span>Думаю…</div></div>` : "");
 }
 async function askAI(q) {
-  if (!CAP.sample || CHAT.busy || !q.trim()) return;
+  if (!aiReady() || CHAT.busy || !q.trim()) return;
   CHAT.busy = true; $("#aiSend").disabled = true; $("#aiStop").hidden = false;
   const ctxIt = CHAT.context ? resolve(CHAT.context) : null;
   const userMsg = (ctxIt ? `[Вопрос задан со страницы материала ${ctxIt.key} — «${ctxIt.title}»]\n` : "") + q.trim();
   CHAT.turns.push({ role: "user", content: q.trim(), sent: userMsg });
   drawChat("");
   CHAT.ctl = new AbortController();
-  let canTools = false; try { canTools = !!(await CAP.sample.limits()).tools; } catch (e) {}
-  let preamble = AI_RULES;
-  if (!canTools) { const hits = search(q).results.slice(0, 4).map(r => itemDoc(r.it)); if (ctxIt) hits.unshift(itemDoc(ctxIt)); preamble += "\n\nМатериалы платформы по запросу:\n" + JSON.stringify(hits).slice(0, 60000); }
-  else preamble += "\n\nИспользуй инструменты search_materials и get_material, прежде чем отвечать.";
-  const turns = [{ role: "user", content: preamble }, ...CHAT.turns.slice(-8).map(t => ({ role: t.role, content: t.sent || t.content }))];
   try {
-    const opts = { signal: CHAT.ctl.signal, onText: ({ text }) => drawChat(text) };
-    if (canTools) opts.tools = AI_TOOLS; else opts.cache = false;
-    const { text, truncated } = await CAP.sample(turns, opts);
-    CHAT.turns.push({ role: "assistant", content: text + (truncated ? "\n\n> Ответ обрезан по длине — уточните вопрос." : "") });
+    let res;
+    if (aiMode() === "key") res = await askViaKey(q, ctxIt);
+    else {
+      let canTools = false; try { canTools = !!(await CAP.sample.limits()).tools; } catch (e) {}
+      let preamble = AI_RULES;
+      if (!canTools) { const hits = search(q).results.slice(0, 4).map(r => itemDoc(r.it)); if (ctxIt) hits.unshift(itemDoc(ctxIt)); preamble += "\n\nМатериалы платформы по запросу:\n" + JSON.stringify(hits).slice(0, 60000); }
+      else preamble += "\n\nИспользуй инструменты search_materials и get_material, прежде чем отвечать.";
+      const turns = [{ role: "user", content: preamble }, ...CHAT.turns.slice(-8).map(t => ({ role: t.role, content: t.sent || t.content }))];
+      const opts = { signal: CHAT.ctl.signal, onText: ({ text }) => drawChat(text) };
+      if (canTools) opts.tools = AI_TOOLS; else opts.cache = false;
+      res = await CAP.sample(turns, opts);
+    }
+    CHAT.turns.push({ role: "assistant", content: res.text + (res.truncated ? "\n\n> Ответ обрезан по длине — уточните вопрос." : "") });
   } catch (e) {
-    const msg = { cancelled: "Ответ остановлен.", not_granted: "Доступ к Claude для этой страницы не разрешён. Разрешение можно выдать в меню разрешений артефакта.", sampling_disabled: "Claude недоступен для этого аккаунта.", rate_limited: "Слишком много запросов или исчерпан лимит. Попробуйте позже.", session_expired: "Сессия истекла — войдите в Claude снова.", refused: "Модель отказалась отвечать на этот запрос. Переформулируйте вопрос.", prompt_too_large: "Запрос слишком большой — сократите вопрос.", empty_completion: "Пустой ответ — попробуйте упростить вопрос." }[e && e.code] || "Не удалось получить ответ из-за временной ошибки. Попробуйте ещё раз.";
+    const msg = aiMode() === "key" ? (e && e.message || "Не удалось получить ответ.") : ({ cancelled: "Ответ остановлен.", not_granted: "Доступ к Claude для этой страницы не разрешён. Разрешение можно выдать в меню разрешений артефакта.", sampling_disabled: "Claude недоступен для этого аккаунта.", rate_limited: "Слишком много запросов или исчерпан лимит. Попробуйте позже.", session_expired: "Сессия истекла — войдите в Claude снова.", refused: "Модель отказалась отвечать на этот запрос. Переформулируйте вопрос.", prompt_too_large: "Запрос слишком большой — сократите вопрос.", empty_completion: "Пустой ответ — попробуйте упростить вопрос." }[e && e.code] || "Не удалось получить ответ из-за временной ошибки. Попробуйте ещё раз.");
     CHAT.turns.push({ role: "assistant", content: (e && e.text ? e.text + "\n\n" : "") + "> " + msg });
-    if (e && (e.code === "not_granted" || e.code === "sampling_disabled")) CAP.sample = null;
+    if (aiMode() === "claude" && e && (e.code === "not_granted" || e.code === "sampling_disabled")) CAP.sample = null;
   }
-  CHAT.busy = false; drawChat(); if ($("#aiSend")) { $("#aiSend").disabled = !CAP.sample; $("#aiStop").hidden = true; }
+  CHAT.busy = false; drawChat(); if ($("#aiSend")) { $("#aiSend").disabled = !aiReady(); $("#aiStop").hidden = true; }
 }
 
 /* ===== FAVORITES & PROFILE ===== */
@@ -259,7 +337,7 @@ function afterRender(r) {
   if (r.view === "calc") $("#calcForm")?.addEventListener("submit", calcSubmit);
   if (r.view === "home") { bindAC($("#heroQ"), q => { if (!q.trim()) return; SEARCH_Q = q; rememberSearch(q); location.hash = "search"; }); $("#heroForm").addEventListener("submit", e => e.preventDefault()); }
   if (r.view === "search") { const i = $("#sQ"); const go = q => { SEARCH_Q = q; rememberSearch(q); $("#sOut").innerHTML = searchOut(); }; bindAC(i, go); $("#sForm").addEventListener("submit", e => e.preventDefault()); if (!SEARCH_Q) i.focus(); }
-  if (r.view === "ai") { drawChat(); if (CHAT.turns.length) drawChat(); $("#aiForm")?.addEventListener("submit", e => { e.preventDefault(); const q = $("#aiQ").value; if (!q.trim()) return; $("#aiQ").value = ""; askAI(q); }); $("#aiQ")?.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("#aiForm").requestSubmit(); } }); $("#aiStop")?.addEventListener("click", () => CHAT.ctl?.abort()); if (!CHAT.turns.length && CHAT.pending) { $("#aiQ").value = CHAT.pending; CHAT.pending = null; } }
+  if (r.view === "ai") { $("#keyForm")?.addEventListener("submit", keySubmit); drawChat(); if (CHAT.turns.length) drawChat(); $("#aiForm")?.addEventListener("submit", e => { e.preventDefault(); const q = $("#aiQ").value; if (!q.trim()) return; $("#aiQ").value = ""; askAI(q); }); $("#aiQ")?.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("#aiForm").requestSubmit(); } }); $("#aiStop")?.addEventListener("click", () => CHAT.ctl?.abort()); if (!CHAT.turns.length && CHAT.pending) { $("#aiQ").value = CHAT.pending; CHAT.pending = null; } }
   if (r.view === "admin") { if (ADM.edit) $("#admForm")?.addEventListener("submit", adminSave); else if (IS_ADMIN && CAP.db) loadAudit(); }
   if (r.view === "profile") $("#histOn")?.addEventListener("change", e => { S.historyOn = e.target.checked; if (!S.historyOn) S.history = []; persist(); route(true); });
 }
@@ -274,7 +352,10 @@ document.addEventListener("click", e => {
   const ask = e.target.closest("[data-ask]"); if (ask) { CHAT.context = ask.dataset.ask; return; }
   const askq = e.target.closest("[data-askq]"); if (askq) { CHAT.pending = askq.dataset.askq; return; }
   if (e.target.closest("[data-ctxclear]")) { CHAT.context = null; route(); return; }
-  const aiq = e.target.closest("[data-aiq]"); if (aiq) { if (CAP.sample) askAI(aiq.dataset.aiq); else toast("Помощник доступен при открытии в Claude"); return; }
+  const aiq = e.target.closest("[data-aiq]"); if (aiq) { if (aiReady()) askAI(aiq.dataset.aiq); else { toast("Сначала подключите ключ Anthropic"); $("#keyInp")?.focus(); } return; }
+  if (e.target.closest("[data-key-edit]")) { CHAT.editKey = true; route(); return; }
+  if (e.target.closest("[data-key-cancel]")) { CHAT.editKey = false; route(); return; }
+  if (e.target.closest("[data-key-forget]")) { forgetKey(); toast("Ключ удалён с этого устройства"); route(); return; }
   const disc = e.target.closest("[data-discuss]"); if (disc && CAP.comments) { const target = $("#artMain header") || $("h1"); CAP.comments.openComposer({ element: target }).then(r => { if (!r.opened) toast("Откройте комментарий ещё раз, кликнув по странице"); }).catch(() => toast("Комментарии недоступны в этом окне")); return; }
   const st = e.target.closest("[data-stype]"); if (st) { SEARCH_TYPE = st.dataset.stype; $$("[data-stype]").forEach(b => b.setAttribute("aria-pressed", b === st)); $("#sOut").innerHTML = searchOut(); return; }
   const sq = e.target.closest("[data-sq]"); if (sq) { SEARCH_Q = sq.dataset.sq; $("#sQ").value = SEARCH_Q; rememberSearch(SEARCH_Q); $("#sOut").innerHTML = searchOut(); return; }

@@ -22,7 +22,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Сборка index.html
-        run: python3 build.py && mkdir -p _site && cp index.html _site/ && touch _site/.nojekyll
+        run: python3 build.py && mkdir -p _site && cp index.html manifest.webmanifest sw.js _site/ && cp -r icons _site/ && touch _site/.nojekyll
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
