@@ -2,7 +2,7 @@
 from pathlib import Path
 ROOT = Path(__file__).parent
 SRC = ROOT / "src"
-JS = ["data.js", "ru_fires.js", "world_fires.js", "fires_2025_26.js", "fires_batch1.js", "fires_detail.js", "fires_detail2.js", "texts.js", "texts_lib.js", "reader.js", "library_full.js", "app1.js", "app2.js", "app3.js", "app4.js", "app5.js"]
+JS = ["data.js", "ru_fires.js", "world_fires.js", "fires_2025_26.js", "fires_batch1.js", "fires_batch2.js", "fires_detail.js", "fires_detail2.js", "texts.js", "texts_lib.js", "reader.js", "library_full.js", "app1.js", "app2.js", "app3.js", "app4.js", "app5.js"]
 js = "".join((SRC / f).read_text(encoding="utf-8") + "\n" for f in JS)
 js += '\n[["logoMark","logo"],["icS","search"],["icF","star"],["icU","user"],["icM","menu"],["icA","shield"]].forEach(([id,k])=>{const e=document.getElementById(id);if(e)e.outerHTML=I[k];});applyTheme();\n'
 page = (SRC / "head.html").read_text(encoding="utf-8") + (SRC / "body.html").read_text(encoding="utf-8") + "<script>\n" + js + "</script>\n"
