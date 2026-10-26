@@ -2213,6 +2213,15 @@ const FULL_BOOKS = [
 FULL_BOOKS.forEach(b => BOOKS.push(Object.assign({ lang: "русский", isbn: null, url: null, fires: [], fragment: "Полный текст доступен в FIREBASE бесплатно", text: b.id, access: "full" }, b)));
 if (TEXTS.p640) TEXTS.p640.test = { href: "#test.gdzs-ticket3", label: "Проверить себя: билет ГДЗС № 3" };
 
+/* --- ссылки, добавленные редактором через вход администратора (перенесены из базы CMS 26.10.2026) --- */
+SOURCES.x_book_povzik_tactics_0 = { title: "Повзик Я. С. Пожарная тактика — файл учебника (.doc)", org: "добавлено редактором", url: "https://aptasbest.ru/updocs/studentu/method/p/ychebnic_pojarn_tactic.doc", type: "Источник, добавленный редактором", accessed: "2026-10-26" };
+[["alexievich-prayer", "https://lib.ru/NEWPROZA/ALEKSIEWICH/chernobyl.txt", "Сведения о легальной электронной версии не проверялись"],
+ ["dyatlov-chernobyl", "https://elib.biblioatom.ru/text/dyatlov_chernobyl-kak-eto-bylo_2001/p0/", "Не подтверждено"],
+ ["gubarev-chernobyl", "https://mybook.ru/author/vladimir-stepanovich-gubarev/strasti-po-chernobylyu/read/", "Не подтверждено"],
+ ["medvedev-notebook", "https://velizary.ru/bt_0030.pdf", "Не подтверждено"],
+ ["povzik-tactics", "https://aptasbest.ru/updocs/studentu/method/p/ychebnic_pojarn_tactic.doc", "Не подтверждено", "x_book_povzik_tactics_0"]
+].forEach(([id, url, fragment, src]) => { const b = BOOKS.find(x => x.id === id); if (!b) return; b.url = url; b.fragment = fragment; if (src && !b.sources.includes(src)) b.sources.push(src); });
+
 /* ===== FIREBASE app: core ===== */
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
