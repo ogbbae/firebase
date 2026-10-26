@@ -39,7 +39,7 @@ function vCatalog(name) {
   const d = CAT_DEF[name], c = CATALOG[name];
   setMeta(d.title, d.lead);
   return `${crumbs([[d.title]])}<h1 class="h1">${d.title}</h1><p class="lead">${d.lead}</p>
-  ${name === "fires" ? `<div class="row" style="margin-top:14px"><a class="btn sm" href="#map">${I.map} Карта пожаров</a><a class="btn sm" href="#compare">${I.cmp} Сравнение</a></div>` : ""}
+  ${name === "fires" ? `<div class="row" style="margin-top:14px"><a class="btn sm" href="#map">${I.map} Карта пожаров</a><a class="btn sm" href="#compare">${I.cmp} Сравнение</a></div>` : ""}${name === "lib" ? `<div class="row" style="margin-top:14px"><a class="btn sm pri" href="#mylib">${I.book} Моя библиотека: прогресс и заметки</a><a class="btn sm" href="#read.pravila-sizod">Читать Правила работы в СИЗОД</a></div>` : ""}
   <div class="cat" data-cat="${name}"><aside class="rail"><details class="railbox" id="railbox" ${matchMedia("(max-width:900px)").matches ? "" : "open"}><summary>Фильтры</summary><div class="in" id="rail">${d.rail(c)}</div></details></aside>
   <div><div class="toolbar"><div class="search-inline">${I.search}<label class="sr" for="catQ">Поиск в разделе</label><input id="catQ" class="inp" value="${esc(c.q)}" placeholder="${d.numberSearch ? "Название или номер документа" : name === "lib" ? "Название или автор" : "Поиск по названию и содержанию"}" autocomplete="off"></div>
   <label class="sr" for="catSort">Сортировка</label><select id="catSort" class="inp">${d.sorts.map(([k, t]) => `<option value="${k}" ${c.sort === k ? "selected" : ""}>${t}</option>`).join("")}</select>
@@ -116,6 +116,7 @@ function vFire(id) {
     else if (k === "books") { const bs = (o.books || []).map(b => resolve("book." + b)).filter(visible); inner = bs.length ? `<div class="rel">${bs.map(b => `<a href="${href(b)}"><b>${esc(b.title)}</b><small>${esc(b.obj.author)}</small></a>`).join("")}</div>` : '<p class="muted">Связанные книги пока не добавлены.</p>'; }
     else if (k === "sources") { inner = '<div id="srcSlot"></div>'; }
     else { const s = o.sections?.[k] || { s: "none", t: "" }; st = s.s; inner = s.t ? `<div class="prose">${md(s.t, ctx)}</div>` : `<p class="muted">Сведения не установлены или не опубликованы в использованных материалах.</p>`; if (!s.t) st = "none"; }
+    (o.schemes || []).filter(sc => sc.section === k).forEach(sc => { (sc.src || []).forEach(id => { if (SOURCES[id] && !ctx.includes(id)) ctx.push(id); }); inner += `<figure class="scheme"><figcaption><span class="eyebrow">Схема</span> ${esc(sc.title)}</figcaption>${sc.svg()}${sc.caption ? `<p class="small muted" style="margin:8px 0 0">${esc(sc.caption)}</p>` : ""}<p class="small" style="margin:6px 0 0;color:var(--fg3)">Схема редакции по данным источников ${(sc.src || []).map(id => "[" + (ctx.indexOf(id) + 1) + "]").join(" ")}, не в масштабе.</p></figure>`; });
     return `<section class="isec" id="s-${k}"><div class="isec-h"><span class="num">${String(n + 1).padStart(2, "0")}</span><h2 class="h3">${t}</h2>${st ? relBadge(st) : ""}</div>${inner}</section>`;
   }).join("");
   const html = `${crumbs([["Реальные пожары", "#fires"], [o.title, null]])}
@@ -156,12 +157,12 @@ function vBook(id) {
   return `${crumbs([["Библиотека", "#lib"], [o.title]])}<div class="art"><article><header class="art-head" style="flex-direction:row;gap:20px;flex-wrap:wrap">
    <div class="cover" style="width:120px;font-size:11px" aria-hidden="true"><i></i><span>${esc(o.title.slice(0, 80))}</span><span class="mono">${o.year || ""}</span></div>
    <div class="stack" style="gap:10px;flex:1;min-width:240px"><span class="kind">${esc(catName(BOOK_CATS, o.cat))}</span><h1 class="h1" style="font-size:clamp(20px,2.6vw,28px)">${esc(o.title)}</h1><p class="muted" style="margin:0">${esc(o.author)}</p>
-   <div class="row">${favBtn(it.key, true)}<button class="btn" data-reading="${esc(it.key)}" aria-pressed="${inList}">${I.book}<span>${inList ? "В списке для изучения" : "Изучить позже"}</span></button>${o.url ? `<a class="btn pri" href="${esc(o.url)}" target="_blank" rel="noopener">Открыть источник</a>` : ""}</div></div></header>
+   <div class="row">${o.access === "full" ? `<a class="btn pri" href="#read.${esc(o.id)}">${I.book} Читать бесплатно</a>` : ""}${favBtn(it.key, true)}<button class="btn" data-reading="${esc(it.key)}" aria-pressed="${inList}">${I.book}<span>${inList ? "В списке для изучения" : "Изучить позже"}</span></button>${o.url ? `<a class="btn ${o.access === "free-pdf" ? "pri" : ""}" href="${esc(o.url)}" target="_blank" rel="noopener">${o.access === "free-pdf" ? "Читать бесплатно (PDF издателя)" : "Открыть источник"}</a>` : ""}</div><div class="row">${accessBadge(o)}<span class="small muted">${esc((ACCESS[o.access] || ACCESS.library)[2])}</span></div></div></header>
    <dl class="facts"><div><dt>Год</dt><dd class="mono">${o.year || "не подтверждён"}</dd></div><div><dt>Издатель</dt><dd>${esc(o.publisher || "не указан")}</dd></div><div><dt>Язык</dt><dd>${esc(o.lang)}</dd></div><div><dt>Объём</dt><dd>${esc(o.pages || "не подтверждён")}</dd></div><div><dt>ISBN / идентификатор</dt><dd class="mono">${esc(o.isbn || o.ids || "нет данных")}</dd></div><div><dt>Доступ</dt><dd>${esc(o.fragment)}</dd></div></dl>
    <div class="prose" style="margin-top:22px"><h2>Описание</h2><p>${esc(o.summary)}</p>
    <h2>Связанные пожары</h2>${fires.length ? `<ul>${fires.map(f => `<li><a href="${href(f)}">${esc(f.title)}</a> — ${esc(f.obj.dateText)}</li>`).join("")}</ul>` : "<p class='muted'>Не указаны.</p>"}
    <h2>Связанные документы</h2>${docs.length ? `<ul>${docs.map(d => `<li><a href="${href(d)}">${esc(d.obj.number || d.title)}</a></li>`).join("")}</ul>` : "<p class='muted'>Не указаны.</p>"}</div>
-   <h2 class="h2" style="margin-top:30px">Источники сведений о книге</h2><div style="margin-top:12px">${sourcesList(ctx)}</div></article>${sidePanel(it)}</div>`;
+   ${diaryHtml(it)}<h2 class="h2" style="margin-top:30px">Источники сведений о книге</h2><div style="margin-top:12px">${sourcesList(ctx)}</div></article>${sidePanel(it)}</div>`;
 }
 
 /* ===== DETAIL: regulation ===== */
@@ -171,7 +172,7 @@ function vNorm(id) {
   const st = DOC_STATUS[o.docStatus] || ["—", "b-none", ""];
   const refs = (o.refs || []).map(r => resolve("ref." + r)).filter(visible);
   return `${crumbs([["Нормативная база", "#norms"], [o.number]])}<div class="art"><article><header class="art-head"><span class="kind">${esc(catName(NORM_TYPES, o.type))}</span><h1 class="h1" style="font-size:clamp(20px,2.8vw,30px)">${esc(o.number)} от ${fmtDate(o.adopted)}</h1><p class="lead" style="margin-top:0">«${esc(o.title)}»</p>
-   <div class="row">${favBtn(it.key, true)}${badge(st[1], st[0])}</div>
+   <div class="row">${o.id === "p640" ? `<a class="btn pri" href="#read.pravila-sizod">${I.book} Читать полный текст</a>` : ""}${favBtn(it.key, true)}${badge(st[1], st[0])}</div>
    <div class="banner ${o.docStatus === "in-force-unverified" ? "" : "warn"}"><span>${I.info}</span><span>${esc(st[2])} ${o.docStatus === "in-force-unverified" ? "FIREBASE не называет документ действующим без такой сверки." : ""}</span></div></header>
    <dl class="facts"><div><dt>Номер</dt><dd class="mono">${esc(o.number)}</dd></div><div><dt>Дата принятия</dt><dd class="mono">${fmtDate(o.adopted)}</dd></div><div><dt>Вступление в силу</dt><dd>${o.effective ? fmtDate(o.effective) : "не указано"}</dd></div><div><dt>Орган</dt><dd>${esc(o.issuer)}</dd></div><div><dt>Регистрация</dt><dd>${esc(o.reg || "—")}</dd></div><div><dt>Последняя проверка</dt><dd class="mono">${o.checked ? fmtDate(o.checked) : "не проводилась"}</dd></div></dl>
    <div class="prose" style="margin-top:22px"><h2>Краткое содержание</h2><p>${esc(o.summary)}</p><h2>История изменений</h2><p>${esc(o.history || "Нет данных.")}</p>

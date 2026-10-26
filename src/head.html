@@ -285,6 +285,24 @@ sup.ref a{font:600 10.5px var(--f-mono);color:var(--red-ink);text-decoration:non
 .tl .tl-text{margin:4px 0 0}
 .tl .tl-body{display:none;margin-top:6px;font-size:13px;color:var(--fg2)}
 
+/* reader */
+.reader-bar{position:sticky;top:calc(60px + env(safe-area-inset-top,0px));z-index:20;display:flex;gap:10px;align-items:center;background:var(--bg);padding:8px 0;border-bottom:1px solid var(--line);margin-bottom:14px}
+.reader{line-height:1.75;max-width:72ch}
+.reader .r-h{font:600 1.15em/1.35 var(--f-body);margin:34px 0 12px}
+.rp{margin:0 0 .9em;scroll-margin-top:130px;border-radius:4px;transition:background .6s}
+.rp.flash{background:var(--warn-soft)}
+mark.hl{background:var(--warn-soft);color:inherit;border-bottom:2px solid var(--warn);cursor:pointer;padding:0 1px}
+.selbar{position:fixed;z-index:85;display:flex;gap:6px;background:var(--card);border:1px solid var(--line2);border-radius:8px;padding:6px;box-shadow:0 8px 24px rgba(0,0,0,.35)}
+.notebox{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:86;width:min(560px,calc(100vw - 32px));background:var(--card);border:1px solid var(--line2);border-radius:12px;padding:12px;box-shadow:0 12px 30px rgba(0,0,0,.4);display:flex;flex-direction:column;gap:8px}
+.notebox blockquote,.notes blockquote{margin:0;padding:4px 10px;border-left:3px solid var(--warn);color:var(--fg2);font-size:13.5px;max-height:6em;overflow:auto}
+.notes{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.notes li{display:flex;justify-content:space-between;gap:8px;border-top:1px solid var(--line);padding-top:8px}
+.notes li p{margin:4px 0;font-size:14px;overflow-wrap:anywhere}
+/* schemes */
+.scheme{margin:14px 0 6px;border:1px solid var(--line);border-radius:var(--r);background:var(--card);padding:12px 14px}
+.scheme figcaption{font-weight:600;font-size:14px;margin-bottom:8px;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.scheme-box{overflow-x:auto}
+.scheme-box svg{display:block;width:100%;height:auto}
 /* compare */
 .cmp{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r)}
 .cmp table{border-collapse:collapse;min-width:720px;width:100%;font-size:14px}

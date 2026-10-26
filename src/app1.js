@@ -49,7 +49,7 @@ function buildIndex() {
   const add = (type, o, extra) => ITEMS.set(type + "." + o.id, Object.assign({ type, id: o.id, key: type + "." + o.id, title: o.title, summary: o.summary || o.desc || "", tags: o.tags || [], status: o._status || "published", obj: o }, extra));
   REFS.forEach(o => add("ref", o, { date: o.updated, text: stripMd(o.body), cat: o.cat }));
   FIRES.forEach(o => add("fire", o, { date: o.date, text: stripMd(fireText(o)) + " " + o.city + " " + o.country, cat: o.cat }));
-  BOOKS.forEach(o => add("book", o, { date: o.year ? String(o.year) : null, text: o.author + " " + o.publisher + " " + o.summary, cat: o.cat }));
+  BOOKS.forEach(o => add("book", o, { date: o.year ? String(o.year) : null, text: o.author + " " + o.publisher + " " + o.summary + (o.text && typeof TEXTS !== "undefined" && TEXTS[o.text] ? " " + TEXTS[o.text].parts.map(p => p[1].join(" ")).join(" ") : ""), cat: o.cat }));
   NORMS.forEach(o => add("norm", o, { date: o.adopted, text: o.number + " " + o.issuer + " " + o.summary + " " + (o.history || ""), cat: o.type }));
   TESTS.forEach(o => add("test", o, { text: o.qs.map(q => q.q + " " + q.e).join(" ") }));
   SCENARIOS.forEach(o => add("scen", o, { summary: o.intro, text: o.steps.map(s => s.q).join(" "), tags: ["учебная симуляция", "сценарий"] }));
@@ -126,8 +126,9 @@ function sourcesList(ids) {
 }
 
 /* ---------- user state: db (synced) or browser (demo) ---------- */
-const DEFAULT_STATE = () => ({ favorites: [], reading: [], history: [], historyOn: false, searches: [], results: [], cards: {}, settings: { theme: "auto" } });
+const DEFAULT_STATE = () => ({ books: {}, favorites: [], reading: [], history: [], historyOn: false, searches: [], results: [], cards: {}, settings: { theme: "auto" } });
 let S = DEFAULT_STATE();
+try { const _l = JSON.parse(localStorage.getItem("firebase-state") || "null"); if (_l) S = Object.assign(DEFAULT_STATE(), _l); } catch (e) {}
 let STORE = { mode: "loading", name: "", db: null, uid: null, user: null };
 let saveTimer = null, saving = false, pendingSave = false;
 function lsGet() { try { const r = localStorage.getItem("firebase-state"); return r ? JSON.parse(r) : null; } catch (e) { return null; } }

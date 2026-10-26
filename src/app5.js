@@ -191,7 +191,7 @@ function vProfile() {
   return `${crumbs([["Профиль"]])}<h1 class="h1">Профиль</h1>
   <div class="grid g2" style="margin-top:18px">
    <div class="panel stack"><span class="eyebrow">Учётная запись</span>${STORE.mode === "account" ? `<p style="margin:0"><b>${esc(STORE.name || "Пользователь Claude")}</b><br><span class="small muted">Вход выполнен через ваш аккаунт Claude. Регистрация и выход управляются в Claude; FIREBASE не хранит пароли.</span></p>${IS_ADMIN ? `<p class="small" style="margin:0">Роль: <b>редактор</b> — доступна <a href="#admin" style="color:var(--red-ink)">админ-панель</a>.</p>` : `<p class="small muted" style="margin:0">Роль: читатель. <a href="#login" style="color:var(--red-ink)">Как получить права редактора</a></p>`}` : `<p style="margin:0"><b>Гость (демо-режим)</b><br><span class="small muted">Отдельной регистрации в FIREBASE нет: учётной записью служит аккаунт Claude. Откройте страницу в Claude, чтобы данные сохранялись в аккаунте.</span></p>`}${storageBanner()}</div>
-   <div class="panel stack"><span class="eyebrow">Прогресс обучения</span><dl class="facts"><div><dt>Пройдено тестов</dt><dd class="mono">${tests} из ${TESTS.length}</dd></div><div><dt>Попыток</dt><dd class="mono">${S.results.length}</dd></div><div><dt>Карточек «знаю»</dt><dd class="mono">${know} из ${CARDS.length}</dd></div><div><dt>В избранном</dt><dd class="mono">${S.favorites.length}</dd></div></dl><a class="btn sm" href="#results">История результатов</a></div>
+   <div class="panel stack"><span class="eyebrow">Прогресс обучения</span><dl class="facts"><div><dt>Пройдено тестов</dt><dd class="mono">${tests} из ${TESTS.length}</dd></div><div><dt>Попыток</dt><dd class="mono">${S.results.length}</dd></div><div><dt>Карточек «знаю»</dt><dd class="mono">${know} из ${CARDS.length}</dd></div><div><dt>В избранном</dt><dd class="mono">${S.favorites.length}</dd></div></dl><a class="btn sm" href="#results">История результатов</a><a class="btn sm" href="#mylib">Моя библиотека</a></div>
   </div>
   <section class="sec"><h2 class="h2">Настройки интерфейса</h2><div class="panel stack" style="margin-top:12px;max-width:560px">
    <div class="field"><span class="lbl" id="thL">Тема оформления</span><div class="thgrid" role="group" aria-labelledby="thL">${THEMES.map(([k, t, d, c]) => `<button class="thcard" data-theme-set="${k}" aria-pressed="${S.settings.theme === k}"><span class="pv" style="background:${c[0]}"><i style="background:${c[1]};width:70%"></i><i style="background:${c[2]};width:35%"></i></span><b>${t}</b><span class="small muted">${d}</span></button>`).join("")}</div><span class="small muted">Тему также можно переключить кнопкой в верхней панели. Выбор сохраняется ${STORE.mode === "account" ? "в вашем аккаунте" : "в этом браузере"}.</span></div>
@@ -331,6 +331,8 @@ async function adminDelete(key) {
 function afterRender(r) {
   if (CAT_DEF[r.view] && !r.arg) bindCatalog(r.view);
   if (r.view === "map") bindMap();
+  if (r.view === "book" && $("#diary")) diaryBind("book." + r.arg);
+  if (r.view === "read" && RD) readerBind();
   if (r.view === "test") drawTest();
   if (r.view === "learn" && r.arg === "cards") drawDeck();
   if (r.view === "scen") drawScen();

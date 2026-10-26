@@ -92,7 +92,7 @@ function bindAC(input, onSubmit) {
 
 /* ===== router ===== */
 const NAV = [["home", "Главная"], ["ref", "Справочник РТП"], ["fires", "Реальные пожары"], ["lib", "Библиотека"], ["norms", "Нормативная база"], ["learn", "Обучение"]];
-const SECTION_OF = { ref: "ref", fire: "fires", fires: "fires", compare: "fires", map: "fires", lib: "lib", book: "lib", norms: "norms", norm: "norms", learn: "learn", test: "learn", scen: "learn", calc: "learn", results: "learn" };
+const SECTION_OF = { read: "lib", mylib: "lib", ref: "ref", fire: "fires", fires: "fires", compare: "fires", map: "fires", lib: "lib", book: "lib", norms: "norms", norm: "norms", learn: "learn", test: "learn", scen: "learn", calc: "learn", results: "learn" };
 let CUR = { view: "home", arg: null };
 let SEARCH_Q = "", SEARCH_TYPE = "all";
 const CATALOG = { ref: { q: "", cat: "all", sort: "title", n: 9 }, fires: { q: "", cat: "all", country: "all", year: "all", scale: "all", sort: "date-desc", view: "cards", n: 9 }, lib: { q: "", cat: "all", sort: "title", n: 9 }, norms: { q: "", type: "all", status: "all", sort: "adopted-desc", n: 12 } };
@@ -103,13 +103,14 @@ function parseHash() {
   const i = h.indexOf("."); if (i < 0) return { view: h, arg: null };
   return { view: h.slice(0, i), arg: h.slice(i + 1) };
 }
-const INTERACTIVE = new Set(["test", "scen", "admin", "ai", "calc", "cards"]);
+const INTERACTIVE = new Set(["test", "scen", "admin", "ai", "calc", "cards", "read"]);
 function route(silent) {
   const r = parseHash();
   if (silent && ((INTERACTIVE.has(r.view) && !(r.view === "admin" && !ADM.edit)) || (r.view === "learn" && r.arg === "cards"))) return;
+  if (typeof RD !== "undefined" && RD) { RD.off && RD.off(); RD.selFn && document.removeEventListener("selectionchange", RD.selFn); RD = null; }
   CUR = r;
   const main = $("#main"); const y = scrollY;
-  const views = { home: vHome, ref: r.arg ? vRefItem : vRefCat, fires: vFireCat, fire: vFire, compare: vCompare, map: vMap, lib: vLibCat, book: vBook, norms: vNormCat, norm: vNorm, learn: r.arg === "cards" ? vCards : vLearn, test: vTest, scen: vScen, calc: vCalc, results: vResults, search: vSearch, ai: vAI, fav: vFav, profile: vProfile, login: vLogin, community: vCommunity, admin: vAdmin, sitemap: vSitemap, about: vAbout };
+  const views = { home: vHome, ref: r.arg ? vRefItem : vRefCat, fires: vFireCat, fire: vFire, compare: vCompare, map: vMap, lib: vLibCat, book: vBook, norms: vNormCat, norm: vNorm, learn: r.arg === "cards" ? vCards : vLearn, test: vTest, scen: vScen, calc: vCalc, results: vResults, search: vSearch, ai: vAI, fav: vFav, profile: vProfile, login: vLogin, read: vRead, mylib: vMyLib, community: vCommunity, admin: vAdmin, sitemap: vSitemap, about: vAbout };
   const fn = views[r.view] || vNotFound;
   let html;
   try { html = fn(r.arg); } catch (e) { console.error(e); html = errorView(e); }
@@ -152,7 +153,7 @@ function cardFire(it, withCmp) {
   <div class="foot">${withCmp ? `<label class="cmpck"><input type="checkbox" data-cmp="${esc(o.id)}" ${COMPARE.has(o.id) ? "checked" : ""}> Сравнить</label>` : "<span></span>"}<span class="row"><a class="btn sm" href="${href(it)}" style="position:relative;z-index:1">Изучить разбор</a>${favBtn(it.key)}</span></div></article>`;
 }
 function cover(o) { return `<div class="cover" aria-hidden="true"><i></i><span>${esc(o.title.slice(0, 60))}</span><span class="mono">${esc(o.year || "")}</span></div>`; }
-function cardBook(it) { const o = it.obj; return `<article class="card link" style="flex-direction:row;gap:14px">${cover(o)}<div class="stack" style="gap:8px;min-width:0;flex:1"><span class="kind">${esc(catName(BOOK_CATS, o.cat))}</span><a class="t" href="${href(it)}">${esc(o.title)}</a><div class="meta"><span>${esc(o.author)}</span><span class="mono">${o.year || "год не подтверждён"}</span></div><div class="foot"><span class="tag">${esc(o.lang)}</span>${favBtn(it.key)}</div></div></article>`; }
+function cardBook(it) { const o = it.obj; return `<article class="card link" style="flex-direction:row;gap:14px">${cover(o)}<div class="stack" style="gap:8px;min-width:0;flex:1"><span class="kind">${esc(catName(BOOK_CATS, o.cat))}</span><a class="t" href="${href(it)}">${esc(o.title)}</a><div class="meta"><span>${esc(o.author)}</span><span class="mono">${o.year || "год не подтверждён"}</span></div><div class="foot">${accessBadge(o)}${favBtn(it.key)}</div></div></article>`; }
 function docStatusBadge(o) { const s = DOC_STATUS[o.docStatus] || ["—", "b-none"]; return badge(s[1], s[0]); }
 function cardNorm(it) { const o = it.obj; return `<article class="card link"><div class="top"><span class="kind">${esc(catName(NORM_TYPES, o.type))}</span>${docStatusBadge(o)}${statusBadge(it)}</div><a class="t" href="${href(it)}">${esc(o.number)} от ${fmtDate(o.adopted)}</a><p class="d">${esc(o.title)}</p><div class="foot"><span class="small muted">${o.checked ? "Проверено " + fmtDate(o.checked) : "Не проверялся"}</span>${favBtn(it.key)}</div></article>`; }
 function cardLearn(it) { const map = { test: "Тест", scen: "Учебная симуляция", calc: "Калькулятор", cards: "Карточки" }; const o = it.obj; return `<article class="card link"><div class="top"><span class="kind">${map[it.type]}</span>${o.level ? `<span class="tag">${esc(o.level)}</span>` : ""}${it.type === "test" ? `<span class="tag mono">${o.qs.length} вопр.</span>` : ""}</div><a class="t" href="${href(it)}">${esc(it.title)}</a><p class="d">${esc(it.summary)}</p><div class="foot"><span></span>${favBtn(it.key)}</div></article>`; }
