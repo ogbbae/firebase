@@ -1,0 +1,422 @@
+// FIREBASE — схема базы данных для серверной версии (Next.js + PostgreSQL + Prisma).
+// Миграции: `npx prisma migrate dev --name init`.
+// Полнотекстовый поиск: колонка search_tsv (tsvector, конфигурация 'russian') добавляется
+// SQL-миграцией к таблицам с контентом; векторный поиск — расширение pgvector (поле embedding).
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearchPostgres", "postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector]
+}
+
+// ---------- пользователи и права ----------
+enum Role {
+  READER
+  CONTRIBUTOR
+  EDITOR
+  ADMIN
+}
+
+model User {
+  id               String          @id @default(cuid())
+  email            String          @unique
+  name             String?
+  role             Role            @default(READER)
+  historyConsent   Boolean         @default(false)
+  settings         Json            @default("{}") // тема, плотность и т.п.
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  favorites        UserFavorite[]
+  testAttempts     TestAttempt[]
+  comments         Comment[]
+  auditLogs        AuditLog[]
+  views            ViewHistory[]
+  readingList      ReadingListItem[]
+}
+
+enum MaterialType {
+  REFERENCE
+  INCIDENT
+  BOOK
+  REGULATION
+  TEST
+  SCENARIO
+  CALCULATOR
+  COURSE
+}
+
+enum PublicationStatus {
+  DRAFT
+  REVIEW
+  PUBLISHED
+  NEEDS_UPDATE
+  ARCHIVED
+}
+
+// Полиморфная ссылка на материал: (materialType, materialId).
+model UserFavorite {
+  id           String       @id @default(cuid())
+  userId       String
+  materialType MaterialType
+  materialId   String
+  createdAt    DateTime     @default(now())
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, materialType, materialId])
+}
+
+model ReadingListItem {
+  id        String   @id @default(cuid())
+  userId    String
+  bookId    String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  book      Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, bookId])
+}
+
+model ViewHistory {
+  id           String       @id @default(cuid())
+  userId       String
+  materialType MaterialType
+  materialId   String
+  viewedAt     DateTime     @default(now())
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, viewedAt])
+}
+
+// ---------- справочники ----------
+model Category {
+  id        String       @id @default(cuid())
+  slug      String
+  title     String
+  scope     MaterialType // к какому разделу относится
+  parentId  String?
+  parent    Category?    @relation("CategoryTree", fields: [parentId], references: [id])
+  children  Category[]   @relation("CategoryTree")
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  references ReferenceArticle[]
+  incidents  FireIncident[]
+  books      Book[]
+  regulations Regulation[]
+
+  @@unique([scope, slug])
+}
+
+model Tag {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  title     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  references  ReferenceArticle[]
+  incidents   FireIncident[]
+  books       Book[]
+  regulations Regulation[]
+}
+
+enum SourceType {
+  OFFICIAL_REPORT
+  LEGAL_ACT
+  COURT_DECISION
+  GOVERNMENT_PUBLICATION
+  SCIENTIFIC
+  PROFESSIONAL
+  MEDIA
+  ENCYCLOPEDIA
+  OTHER
+}
+
+model Source {
+  id             String     @id @default(cuid())
+  title          String
+  authorOrg      String
+  url            String?
+  publishedAt    String?    // допускает неполные даты: "2024", "2024-09"
+  accessedAt     DateTime   // дата обращения / проверки
+  type           SourceType
+  originalAvailable Boolean @default(true)
+  notes          String?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  citations      SourceCitation[]
+}
+
+// Привязка источника к материалу (и при необходимости к разделу/событию).
+model SourceCitation {
+  id           String       @id @default(cuid())
+  sourceId     String
+  materialType MaterialType
+  materialId   String
+  sectionKey   String?      // например "investigation" для разбора пожара
+  locator      String?      // страница, пункт, параграф
+  source       Source       @relation(fields: [sourceId], references: [id], onDelete: Restrict)
+
+  @@index([materialType, materialId])
+}
+
+// ---------- контент ----------
+model ReferenceArticle {
+  id            String            @id @default(cuid())
+  slug          String            @unique
+  title         String
+  summary       String
+  body          String            // разметка (Markdown-подмножество)
+  categoryId    String
+  category      Category          @relation(fields: [categoryId], references: [id])
+  tags          Tag[]
+  status        PublicationStatus @default(DRAFT)
+  lastVerifiedAt DateTime?
+  actualityNote String?
+  embedding     Unsupported("vector(1536)")?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+}
+
+enum Reliability {
+  CONFIRMED_FACT
+  OFFICIAL_FINDING
+  PRELIMINARY
+  EXPERT_INTERPRETATION
+  NOT_ESTABLISHED
+}
+
+model FireIncident {
+  id                  String            @id @default(cuid())
+  slug                String            @unique
+  title               String
+  occurredOn          String            // ISO, допускает неполные даты
+  dateText            String
+  country             String
+  region              String?
+  city                String?
+  latitude            Float?            // только при надёжных данных
+  longitude           Float?
+  geoPrecision        String?           // "город", "район", "адрес"
+  deathsCount         Int?              // null, если число не установлено
+  deathsText          String
+  injuredText         String?
+  scale               String?
+  investigationStatus String?
+  summary             String
+  categoryId          String
+  category            Category          @relation(fields: [categoryId], references: [id])
+  tags                Tag[]
+  sections            IncidentSection[]
+  timeline            IncidentTimelineEvent[]
+  imageAssetId        String?           // только при подтверждённом праве использования
+  status              PublicationStatus @default(DRAFT)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+}
+
+model IncidentSection {
+  id          String       @id @default(cuid())
+  incidentId  String
+  key         String       // general, object, origin, development, spread, units, forces, evacuation, consequences, investigation, causes, lessons
+  body        String
+  reliability Reliability
+  incident    FireIncident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+
+  @@unique([incidentId, key])
+}
+
+model IncidentTimelineEvent {
+  id          String       @id @default(cuid())
+  incidentId  String
+  order       Int
+  whenText    String       // точное время только если опубликовано
+  description String
+  reliability Reliability
+  sourceId    String?
+  incident    FireIncident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+
+  @@index([incidentId, order])
+}
+
+model Book {
+  id            String            @id @default(cuid())
+  slug          String            @unique
+  title         String
+  authors       String
+  year          Int?
+  publisher     String?
+  language      String
+  pages         String?
+  isbn          String?
+  otherIds      String?
+  summary       String
+  fragmentInfo  String?
+  legalUrl      String?
+  coverAssetId  String?
+  categoryId    String
+  category      Category          @relation(fields: [categoryId], references: [id])
+  tags          Tag[]
+  readingList   ReadingListItem[]
+  status        PublicationStatus @default(DRAFT)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+}
+
+enum RegulationStatus {
+  IN_FORCE_VERIFIED
+  IN_FORCE_UNVERIFIED
+  EXPIRED
+  REPEALED
+}
+
+model Regulation {
+  id             String            @id @default(cuid())
+  slug           String            @unique
+  number         String
+  title          String
+  docType        String
+  adoptedOn      String
+  effectiveOn    String?
+  issuer         String
+  registration   String?
+  legalStatus    RegulationStatus  @default(IN_FORCE_UNVERIFIED)
+  lastCheckedAt  DateTime?
+  summary        String
+  officialUrl    String?
+  categoryId     String
+  category       Category          @relation(fields: [categoryId], references: [id])
+  tags           Tag[]
+  versions       RegulationVersion[]
+  status         PublicationStatus @default(DRAFT)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+}
+
+model RegulationVersion {
+  id           String     @id @default(cuid())
+  regulationId String
+  validFrom    String?
+  changedBy    String     // реквизиты изменяющего акта
+  note         String?
+  regulation   Regulation @relation(fields: [regulationId], references: [id], onDelete: Cascade)
+}
+
+// ---------- обучение ----------
+model EducationalCourse {
+  id          String            @id @default(cuid())
+  slug        String            @unique
+  title       String
+  description String
+  status      PublicationStatus @default(DRAFT)
+  tests       Test[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+}
+
+model Test {
+  id          String            @id @default(cuid())
+  slug        String            @unique
+  title       String
+  description String
+  difficulty  String
+  courseId    String?
+  course      EducationalCourse? @relation(fields: [courseId], references: [id])
+  questions   Question[]
+  attempts    TestAttempt[]
+  status      PublicationStatus @default(DRAFT)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+}
+
+model Question {
+  id           String   @id @default(cuid())
+  testId       String
+  order        Int
+  prompt       String
+  options      Json     // ["вариант а", ...]
+  correctIndex Int
+  explanation  String
+  test         Test     @relation(fields: [testId], references: [id], onDelete: Cascade)
+}
+
+model TestAttempt {
+  id         String   @id @default(cuid())
+  userId     String
+  testId     String
+  score      Int
+  total      Int
+  answers    Json
+  finishedAt DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  test       Test     @relation(fields: [testId], references: [id], onDelete: Cascade)
+
+  @@index([userId, finishedAt])
+}
+
+model Calculator {
+  id            String   @id @default(cuid())
+  slug          String   @unique
+  title         String
+  description   String
+  inputsSchema  Json     // поля, единицы, допустимые диапазоны
+  formula       String   // запись формулы для отображения
+  limitations   String
+  sourceId      String   // источник формулы обязателен
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// ---------- связи, сообщество, аудит ----------
+model RelatedMaterial {
+  id         String       @id @default(cuid())
+  fromType   MaterialType
+  fromId     String
+  toType     MaterialType
+  toId       String
+  manual     Boolean      @default(true) // false — рассчитано по тегам
+  reason     String?
+  createdAt  DateTime     @default(now())
+
+  @@unique([fromType, fromId, toType, toId])
+}
+
+enum CommentStatus {
+  VISIBLE
+  PENDING
+  HIDDEN
+  REMOVED
+}
+
+model Comment {
+  id           String        @id @default(cuid())
+  authorId     String
+  materialType MaterialType
+  materialId   String
+  parentId     String?
+  kind         String        @default("comment") // comment, review, correction
+  body         String
+  status       CommentStatus @default(PENDING)
+  reports      Int           @default(0)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  author       User          @relation(fields: [authorId], references: [id])
+
+  @@index([materialType, materialId, status])
+}
+
+model AuditLog {
+  id           String       @id @default(cuid())
+  actorId      String
+  action       String       // create, update, status_change, delete, link
+  materialType MaterialType?
+  materialId   String?
+  diff         Json?
+  createdAt    DateTime     @default(now())
+  actor        User         @relation(fields: [actorId], references: [id])
+
+  @@index([materialType, materialId, createdAt])
+}
