@@ -1571,6 +1571,7 @@ async function flush() {
   catch (e) { if (e && e.code === "invalid_argument") { STORE.mode = "local"; lsSet(S); toast("Не удалось сохранить в аккаунт — данные сохраняются в этом браузере"); renderBar(); } }
   saving = false; if (pendingSave) { pendingSave = false; flush(); }
 }
+window.addEventListener("pagehide", () => { if (STORE.mode !== "account") lsSet(S); });
 function isFav(key) { return S.favorites.includes(key); }
 function toggleFav(key) {
   const i = S.favorites.indexOf(key);
@@ -1586,7 +1587,7 @@ function addHistory(key) { if (!S.historyOn) return; S.history = [{ key, at: new
 /* theme */
 const THEMES = [["dark", "Тёмная", "графит, по умолчанию", ["#111418", "#1A1F25", "#E53935"]], ["light", "Светлая", "для дневного света и печати", ["#F3F4F6", "#FFFFFF", "#C62828"]], ["contrast", "Контрастная", "максимальная читаемость", ["#000000", "#FFFFFF", "#FF4D4D"]], ["auto", "Как в Claude", "следует теме приложения", ["#111418", "#F3F4F6", "#E53935"]]];
 function applyTheme() { const t = S.settings.theme; if (["light", "dark", "contrast"].includes(t)) document.documentElement.setAttribute("data-ui", t); else document.documentElement.removeAttribute("data-ui"); const ic = document.getElementById("themeBtn"); if (ic) { const light = t === "light" || (t === "auto" && document.documentElement.getAttribute("data-theme") === "light"); ic.innerHTML = light ? I.sun : I.moon; } }
-function setTheme(t) { S.settings.theme = t; persist(); applyTheme(); $$("[data-theme-set]").forEach(b => { b.setAttribute("aria-pressed", b.dataset.themeSet === t); b.setAttribute("aria-checked", b.dataset.themeSet === t); }); toast("Тема: " + (THEMES.find(x => x[0] === t) || [, ""])[1]); }
+function setTheme(t) { S.settings.theme = t; clearTimeout(saveTimer); flush(); applyTheme(); $$("[data-theme-set]").forEach(b => { b.setAttribute("aria-pressed", b.dataset.themeSet === t); b.setAttribute("aria-checked", b.dataset.themeSet === t); }); toast("Тема: " + (THEMES.find(x => x[0] === t) || [, ""])[1]); }
 function themeMenu() { return `<div class="thmenu" id="thmenu" role="menu" aria-label="Тема оформления">${THEMES.map(([k, t, d, c]) => `<button role="menuitemradio" aria-checked="${S.settings.theme === k}" data-theme-set="${k}"><span class="sw" aria-hidden="true">${c.map(x => `<i style="background:${x}"></i>`).join("")}</span><span>${t}<small>${d}</small></span></button>`).join("")}</div>`; }
 
 let toastT;
